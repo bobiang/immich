@@ -45,3 +45,81 @@ networks:
   immich:
   traefik-public:
     external: true
+
+
+version: "3.8"
+services:
+  immich-server:
+    container_name: immich_server
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    command: [ "start.sh", "immich" ]
+    networks:
+      - immich
+    volumes:
+      - /path/to/upload:/usr/src/app/upload
+    env_file:
+      - ./services/immich/.env
+    depends_on:
+      - redis
+      - database
+    restart: unless-stopped
+
+  immich-microservices:
+    container_name: immich_microservices
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    command: [ "start.sh", "microservices" ]
+    networks:
+      - immich
+    volumes:
+      - /path/to/upload:/usr/src/app/upload
+    env_file:
+      - ./services/immich/.env
+    depends_on:
+      - redis
+      - database
+    restart: unless-stopped
+
+  immich-web:
+    container_name: immich_web
+    image: ghcr.io/immich-app/immich-web:${IMMICH_VERSION:-release}
+    networks:
+      - immich
+    env_file:
+      - ./services/immich/.env
+    restart: unless-stopped
+
+  redis:
+    container_name: immich_redis
+    image: redis:6.2-alpine@sha256:70a7a5b641117670beae0d80658430853896b5ef269ccf00d1827427e3263fa3
+    networks:
+      - immich
+    restart: unless-stopped
+
+  database:
+    container_name: immich_postgres
+    image: postgres:14-alpine@sha256:28407a9961e76f2d285dc6991e8e48893503cc3836a4755bbc2d40bcc272a441
+    networks:
+      - immich
+    env_file:
+      - ./services/immich/.env
+    volumes:
+      - ./path/to/immich/postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  immich-proxy:
+    container_name: immich_proxy
+    image: ghcr.io/immich-app/immich-proxy:${IMMICH_VERSION:-release}
+    networks:
+      - immich
+    env_file:
+      - ./services/immich/.env
+    ports:
+      - 2283:8080
+    depends_on:
+      - immich-server
+      - immich-web
+    restart: unless-stopped
+
+networks:  
+  immich:
+    external: true
