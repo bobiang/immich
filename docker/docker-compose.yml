@@ -6,10 +6,20 @@ services:
     image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
     command: ["start.sh", "immich"]
     networks:
+      - traefik-public
       - immich
     volumes:
       - ${UPLOAD_LOCATION}:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
+    labels:
+      traefik.enable: "true"
+      traefik.http.services.media-immich-api.loadbalancer.server.port: "3001"
+      traefik.http.routers.media-immich-api.rule: "Host(`immich.<MY_DOMAIN>`) && Pathprefix(`/api`)"
+      traefik.http.routers.media-immich-api.middlewares: my-torblock@docker, service-immich-api-strip
+      traefik.http.middlewares.service-immich-api-strip.stripprefix.prefixes: "/api"
+      traefik.http.routers.media-immich-api.tls: true
+      traefik.http.routers.media-immich-api.tls.certresolver: letsencrypt
+      traefik.http.routers.media-immich-api.entrypoints: websecure
     env_file:
       - .env
     depends_on:
@@ -40,9 +50,18 @@ services:
     container_name: immich_web
     image: ghcr.io/immich-app/immich-web:${IMMICH_VERSION:-release}
     networks:
+      - traefik-public
       - immich
     env_file:
       - .env
+    labels:
+      traefik.enable: "true"
+      traefik.http.services.media-immich.loadbalancer.server.port: "3000"
+      traefik.http.routers.media-immich.rule: "Host(`immich.<MY_DOMAIN>`)"
+      traefik.http.routers.media-immich.middlewares: my-torblock@docker
+      traefik.http.routers.media-immich.tls: true
+      traefik.http.routers.media-immich.tls.certresolver: letsencrypt
+      traefik.http.routers.media-immich.entrypoints: websecure
     restart: always
 
   redis:
@@ -64,7 +83,7 @@ services:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_DB: ${DB_DATABASE_NAME}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./path/to/immich/postgres:/var/lib/postgresql/data
     restart: always
 
   immich-proxy:
@@ -85,4 +104,5 @@ services:
 
 networks:  
   immich:
+  traefik-public:
     external: true
